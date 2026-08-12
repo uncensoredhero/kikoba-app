@@ -1,12 +1,11 @@
 {
   "functions": {
-    "api/index.ts": {
-      "includeFiles": "public/**"
-    }
+    "api/index.ts": { "includeFiles": "public/**" },
+    "api/[...path].ts": { "includeFiles": "public/**" }
   },
   "rewrites": [
     { "source": "/", "destination": "/api/index" },
-    { "source": "/health", "destination": "/api/index" },
-    { "source": "/v1/:path*", "destination": "/api/index" }
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/v1/:path*", "destination": "/api/v1/:path*" }
   ]
 }
