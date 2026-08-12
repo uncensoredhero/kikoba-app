@@ -1,61 +1,57 @@
 # Kikoba
 
-Kikoba is a short-term savings platform built around demonstrated saving behavior rather than raw wealth. This repository contains the V1 scoring foundation.
+Kikoba is a behavioral savings application built around demonstrated saving habits rather than raw wealth.
 
-## Architecture
+## Current MVP
+
+The application now includes a runnable web dashboard and API for:
+
+- account creation
+- savings goal creation
+- weekly/monthly contribution schedules
+- deposits and auto-allocation
+- contribution progress
+- Kikoba Score and confidence
+- saver profiles
+- goal dashboard
+- friendships
+- conversations and messages
+- chamas and membership
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+The current MVP uses an in-memory application store so the complete user flow can run immediately. The Prisma/PostgreSQL schema remains the production persistence target and should be connected before deployment.
+
+## Core scoring architecture
 
 `events -> allocation -> contribution status -> features -> score + confidence -> profile`
 
-### Score
+The score is calculated from consistency, goal completion, streaks, amount reliability, timing, recovery, momentum, commitment load, and participation reliability.
 
-```
-K = 1000 * (
-  .25 consistency + .15 goalCompletion + .10 streak + .10 amountReliability +
-  .10 timing + .10 recovery + .10 momentum + .05 commitmentLoad + .05 participationReliability
-)
-```
+## Main API
 
-Every component is normalized to 0..1. The score is clamped to 0..1000.
+- `POST /v1/auth/register`
+- `GET /v1/users/:userId/dashboard`
+- `POST /v1/goals`
+- `GET /v1/users/:userId/goals`
+- `POST /v1/deposits`
+- `GET /v1/users/:userId/score`
+- `POST /v1/friends`
+- `GET /v1/users/:userId/friends`
+- `POST /v1/conversations`
+- `POST /v1/conversations/:id/messages`
+- `GET /v1/conversations/:id/messages`
+- `POST /v1/chamas`
+- `POST /v1/chamas/:id/members`
+- `GET /v1/chamas/:id`
 
-### Confidence
+## Production work remaining
 
-Confidence is separate from the score so a user cannot gain a highly trusted score after a single deposit.
-
-## Deposit allocation rules
-
-1. Explicit deposits remain in the chosen goal.
-2. Eligible commitments are limited to overdue/current commitments and up to 30 days ahead.
-3. Recovery-eligible commitments are allocated first.
-4. Then the oldest due date wins.
-5. User priority breaks equal-due-date ties.
-6. Partial contributions are allowed.
-7. Excess remains unallocated and does not create unlimited future consistency credit.
-
-## API preview endpoints
-
-- `GET /health`
-- `POST /v1/score/preview`
-- `POST /v1/deposits/allocate-preview`
-
-These preview endpoints are intentionally pure and deterministic. The next integration layer will persist deposits, allocations, contribution status transitions, score history, and daily jobs through Prisma/PostgreSQL.
-
-## Local setup
-
-1. Copy `.env.example` to `.env`.
-2. Set `DATABASE_URL` to PostgreSQL.
-3. Run `npm install`.
-4. Run `npm run prisma:generate`.
-5. Run `npm run dev`.
-6. Run `npm test`.
-
-## V1 profile labels
-
-- Consistent Builder
-- Rapid Improver
-- Stable Planner
-- Recovery Specialist
-- Emerging Saver
-- Building Consistency
-- Consider simplifying your commitments
-
-The user-facing labels are deliberately supportive. Internal classification can remain more technical.
+Before handling real money or sensitive financial data, replace the in-memory store with Prisma/PostgreSQL transactions, add real authentication and authorization, connect a licensed payment provider, add idempotency/reversal handling, background jobs, rate limiting, monitoring, encryption, backups, and security review.
