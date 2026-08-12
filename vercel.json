@@ -6,7 +6,6 @@
   },
   "rewrites": [
     { "source": "/", "destination": "/api/index" },
-    { "source": "/health", "destination": "/api/[...path]" },
-    { "source": "/v1/:path*", "destination": "/api/v1/:path*" }
+    { "source": "/health", "destination": "/api/[...path]" }
   ]
 }
