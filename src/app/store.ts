@@ -5,10 +5,11 @@ export type Goal={id:string;userId:string;name:string;targetAmount:number;target
 export type Contribution={id:string;userId:string;goalId:string;expectedAmount:number;amountPaid:number;dueDate:Date;gracePeriodEnd:Date;status:any;completedAt?:Date;recoveredAt?:Date};
 export type Deposit={id:string;userId:string;amount:number;goalId?:string;createdAt:Date};
 export type Message={id:string;conversationId:string;senderId:string;body:string;createdAt:Date};
-export type Conversation={id:string;memberIds:string[];createdAt:Date};
-export type Chama={id:string;name:string;ownerId:string;memberIds:string[];createdAt:Date};
+export type Conversation={id:string;memberIds:string[];createdAt:Date;chamaId?:string};
+export type Chama={id:string;name:string;ownerId:string;memberIds:string[];type:"LONG_TERM"|"SHORT_TERM";contribution:number;frequency:"WEEKLY"|"MONTHLY";maxMembers:number;minTier:string;goal?:string;cycleStartedAt?:Date;createdAt:Date};
+export type FriendRequest={id:string;fromId:string;toId:string;createdAt:Date;status:"PENDING"|"ACCEPTED"|"DECLINED"};
 
-export const db={users:new Map<string,User>(),goals:new Map<string,Goal>(),contributions:new Map<string,Contribution>(),deposits:new Map<string,Deposit>(),scores:new Map<string,any[]>(),friends:new Map<string,Set<string>>(),conversations:new Map<string,Conversation>(),messages:new Map<string,Message[]>(),chamas:new Map<string,Chama>()};
+export const db={users:new Map<string,User>(),goals:new Map<string,Goal>(),contributions:new Map<string,Contribution>(),deposits:new Map<string,Deposit>(),scores:new Map<string,any[]>(),friends:new Map<string,Set<string>>(),friendRequests:new Map<string,FriendRequest>(),conversations:new Map<string,Conversation>(),messages:new Map<string,Message[]>(),chamas:new Map<string,Chama>()};
 export const id=()=>randomUUID();
-export function addFriend(a:string,b:string){if(a===b) return; if(!db.friends.has(a))db.friends.set(a,new Set());if(!db.friends.has(b))db.friends.set(b,new Set());db.friends.get(a)!.add(b);db.friends.get(b)!.add(a)}
+export function addFriend(a:string,b:string){if(a===b)return;if(!db.friends.has(a))db.friends.set(a,new Set());if(!db.friends.has(b))db.friends.set(b,new Set());db.friends.get(a)!.add(b);db.friends.get(b)!.add(a)}
 export function goalSchedule(goal:Goal){const n=goal.frequency==="WEEKLY"?12:6;const step=goal.frequency==="WEEKLY"?7:30;const out:Contribution[]=[];for(let i=0;i<n;i++){const due=new Date(Date.now()+step*86400000*(i+1));const c={id:id(),userId:goal.userId,goalId:goal.id,expectedAmount:goal.expectedAmount,amountPaid:0,dueDate:due,gracePeriodEnd:new Date(due.getTime()+2*86400000),status:"PENDING"};db.contributions.set(c.id,c);out.push(c)}return out}
