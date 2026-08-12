@@ -19,7 +19,7 @@ body{font-family:system-ui;max-width:900px;margin:30px auto;padding:0 16px;backg
 <section><h2>Friends & chat</h2><input id="friendId" placeholder="Friend user ID"><button type="button" onclick="friend()">Add friend</button><div id="friends"></div></section>
 </main>
 <script>
-const API='/v1';
+const API='/api/v1';
 let user=JSON.parse(localStorage.getItem('kikobaUser')||'null');
 const $=id=>document.getElementById(id);
 async function api(path,method='GET',body){
@@ -30,31 +30,17 @@ async function api(path,method='GET',body){
   return x;
 }
 async function register(){
-  const message=$('authMessage');
-  const button=$('registerButton');
-  message.textContent='';
-  const userName=$('name').value.trim();
-  const userEmail=$('email').value.trim();
+  const message=$('authMessage'); const button=$('registerButton'); message.textContent='';
+  const userName=$('name').value.trim(); const userEmail=$('email').value.trim();
   if(userName.length<2){message.textContent='Please enter a name with at least 2 characters.';return}
   if(!userEmail){message.textContent='Please enter your email.';return}
   button.disabled=true;button.textContent='Creating account...';
-  try{
-    user=await api('/auth/register','POST',{name:userName,email:userEmail});
-    localStorage.setItem('kikobaUser',JSON.stringify(user));
-    show();
-  }catch(error){message.textContent=error.message==='EMAIL_EXISTS'?'An account with this email already exists.':'Could not create your account: '+error.message}
+  try{user=await api('/auth/register','POST',{name:userName,email:userEmail});localStorage.setItem('kikobaUser',JSON.stringify(user));show()}
+  catch(error){message.textContent=error.message==='EMAIL_EXISTS'?'An account with this email already exists.':'Could not create your account: '+error.message}
   finally{button.disabled=false;button.textContent='Create account'}
 }
-function show(){
-  $('auth').style.display='none';$('app').style.display='block';$('hello').textContent='Hello, '+user.name;load().catch(error=>console.error(error));
-}
-async function load(){
-  const d=await api('/users/'+encodeURIComponent(user.id)+'/dashboard');
-  $('score').textContent=d.score.score+'/1000';$('confidence').textContent=Math.round(d.score.confidence*100)+'%';$('profile').textContent=d.score.profile;
-  $('goals').innerHTML='';$('goalSelect').innerHTML='<option value="">Auto allocate</option>';
-  d.goals.forEach(g=>{$('goals').innerHTML+='<div class="goal"><b>'+escapeHtml(g.name)+'</b> — KSh '+g.saved+' / '+g.targetAmount+' ('+Math.round(g.progress*100)+'%)</div>';$('goalSelect').innerHTML+='<option value="'+g.id+'">'+escapeHtml(g.name)+'</option>'});
-  const f=await api('/users/'+encodeURIComponent(user.id)+'/friends');$('friends').innerHTML=f.map(x=>'<div>'+escapeHtml(x.name)+' <small>'+x.id+'</small></div>').join('');
-}
+function show(){$('auth').style.display='none';$('app').style.display='block';$('hello').textContent='Hello, '+user.name;load().catch(console.error)}
+async function load(){const d=await api('/users/'+encodeURIComponent(user.id)+'/dashboard');$('score').textContent=d.score.score+'/1000';$('confidence').textContent=Math.round(d.score.confidence*100)+'%';$('profile').textContent=d.score.profile;$('goals').innerHTML='';$('goalSelect').innerHTML='<option value="">Auto allocate</option>';d.goals.forEach(g=>{$('goals').innerHTML+='<div class="goal"><b>'+escapeHtml(g.name)+'</b> — KSh '+g.saved+' / '+g.targetAmount+' ('+Math.round(g.progress*100)+'%)</div>';$('goalSelect').innerHTML+='<option value="'+g.id+'">'+escapeHtml(g.name)+'</option>'});const f=await api('/users/'+encodeURIComponent(user.id)+'/friends');$('friends').innerHTML=f.map(x=>'<div>'+escapeHtml(x.name)+' <small>'+x.id+'</small></div>').join('')}
 async function goal(){try{await api('/goals','POST',{userId:user.id,name:$('goalName').value.trim(),targetAmount:+$('target').value,expectedAmount:+$('contribution').value,frequency:$('frequency').value});await load()}catch(error){alert(error.message)}}
 async function deposit(){try{await api('/deposits','POST',{userId:user.id,amount:+$('amount').value,goalId:$('goalSelect').value||undefined});$('amount').value='';await load()}catch(error){alert(error.message)}}
 async function friend(){try{await api('/friends','POST',{userId:user.id,friendId:$('friendId').value.trim()});await load()}catch(error){alert(error.message)}}
