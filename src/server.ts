@@ -4,7 +4,9 @@ import { z } from "zod";
 import { db,id,addFriend } from "./app/store.js";
 import { createUser,createGoal,makeDeposit,dashboard,userScore } from "./app/service.js";
 
-const app=express();app.use(express.json());app.use(express.static("public"));
+export const app=express();
+app.use(express.json());
+app.use(express.static("public"));
 const asyncRoute=(fn:any)=>(req:any,res:any,next:any)=>Promise.resolve(fn(req,res,next)).catch(next);
 app.get("/health",(_req,res)=>res.json({ok:true,service:"kikoba"}));
 app.post("/v1/auth/register",asyncRoute((req:any,res:any)=>{const b=z.object({name:z.string().min(2),email:z.string().email()}).parse(req.body);if([...db.users.values()].some(u=>u.email===b.email))return res.status(409).json({error:"EMAIL_EXISTS"});res.status(201).json(createUser(b.name,b.email))}));
@@ -22,4 +24,7 @@ app.post("/v1/chamas",asyncRoute((req:any,res:any)=>{const b=z.object({ownerId:z
 app.post("/v1/chamas/:id/members",asyncRoute((req:any,res:any)=>{const b=z.object({userId:z.string()}).parse(req.body);const c=db.chamas.get(req.params.id);if(!c)return res.status(404).json({error:"CHAMA_NOT_FOUND"});if(!c.memberIds.includes(b.userId))c.memberIds.push(b.userId);res.json(c)}));
 app.get("/v1/chamas/:id",(req,res)=>{const c=db.chamas.get(req.params.id);if(!c)return res.status(404).json({error:"CHAMA_NOT_FOUND"});res.json({...c,members:c.memberIds.map(i=>db.users.get(i))})});
 app.use((err:any,_req:any,res:any,_next:any)=>{if(err instanceof z.ZodError)return res.status(400).json({error:"VALIDATION_ERROR",details:err.issues});console.error(err);res.status(500).json({error:"INTERNAL_ERROR"})});
-app.listen(process.env.PORT||3000,()=>console.log("Kikoba API listening"));
+
+if (process.env.VERCEL !== "1") {
+  app.listen(process.env.PORT||3000,()=>console.log("Kikoba API listening"));
+}
