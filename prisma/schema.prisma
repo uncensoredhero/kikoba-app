@@ -1,0 +1,124 @@
+generator client { provider = "prisma-client-js" }
+
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+enum GoalStatus { DRAFT ACTIVE PAUSED COMPLETED CANCELLED EXPIRED }
+enum ContributionStatus { PENDING PARTIAL ON_TIME GRACE LATE MISSED RECOVERED }
+enum DepositStatus { PENDING SUCCESSFUL FAILED REVERSED }
+enum AllocationMode { EXPLICIT AUTO_ALLOCATE }
+enum Priority { HIGH NORMAL LOW }
+enum EventType { DEPOSIT_SUCCESS DEPOSIT_REVERSED CONTRIBUTION_COMPLETED CONTRIBUTION_PARTIAL CONTRIBUTION_LATE CONTRIBUTION_MISSED CONTRIBUTION_RECOVERED GOAL_COMPLETED GOAL_CANCELLED GOAL_EXPIRED CHAMA_JOINED CHAMA_LEFT WITHDRAWAL_COMPLETED }
+
+model User {
+  id String @id @default(cuid())
+  createdAt DateTime @default(now())
+  goals SavingsGoal[]
+  deposits Deposit[]
+  contributions ExpectedContribution[]
+  scores UserScore[]
+  features ScoreFeature[]
+  events FinancialEvent[]
+}
+
+model SavingsGoal {
+  id String @id @default(cuid())
+  userId String
+  name String
+  targetAmount Decimal @db.Decimal(18,2)
+  targetDate DateTime?
+  expectedAmount Decimal @db.Decimal(18,2)
+  frequency String
+  priority Priority @default(NORMAL)
+  status GoalStatus @default(DRAFT)
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  contributions ExpectedContribution[]
+}
+
+model ExpectedContribution {
+  id String @id @default(cuid())
+  userId String
+  goalId String?
+  expectedAmount Decimal @db.Decimal(18,2)
+  amountPaid Decimal @default(0) @db.Decimal(18,2)
+  dueDate DateTime
+  gracePeriodEnd DateTime
+  status ContributionStatus @default(PENDING)
+  completedAt DateTime?
+  recoveredAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  goal SavingsGoal? @relation(fields:[goalId], references:[id], onDelete: SetNull)
+  allocations DepositAllocation[]
+  @@index([userId, dueDate, status])
+}
+
+model Deposit {
+  id String @id @default(cuid())
+  userId String
+  amount Decimal @db.Decimal(18,2)
+  destinationGoalId String?
+  allocationMode AllocationMode @default(EXPLICIT)
+  status DepositStatus @default(PENDING)
+  source String?
+  createdAt DateTime @default(now())
+  reversedAt DateTime?
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  allocations DepositAllocation[]
+}
+
+model DepositAllocation {
+  id String @id @default(cuid())
+  depositId String
+  contributionId String
+  amount Decimal @db.Decimal(18,2)
+  createdAt DateTime @default(now())
+  reversedAt DateTime?
+  deposit Deposit @relation(fields:[depositId], references:[id], onDelete: Cascade)
+  contribution ExpectedContribution @relation(fields:[contributionId], references:[id], onDelete: Cascade)
+  @@index([depositId])
+  @@index([contributionId])
+}
+
+model FinancialEvent {
+  id String @id @default(cuid())
+  userId String
+  type EventType
+  entityType String
+  entityId String
+  metadata Json?
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+
+model ScoreFeature {
+  id String @id @default(cuid())
+  userId String
+  consistency Float
+  goalCompletion Float
+  streak Float
+  amountReliability Float
+  timing Float
+  recovery Float
+  momentum Float
+  commitmentLoad Float
+  participationReliability Float
+  confidence Float
+  eventCount Int
+  calculatedAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+}
+
+model UserScore {
+  id String @id @default(cuid())
+  userId String
+  score Int
+  confidence Float
+  profile String
+  reason String?
+  featureSnapshot Json
+  calculatedAt DateTime @default(now())
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  @@index([userId, calculatedAt])
+}
