@@ -7,131 +7,34 @@ import { createUser, createGoal, makeDeposit, dashboard, userScore } from "./app
 export const app = express();
 app.use(express.json());
 app.use(express.static("public"));
+const asyncRoute=(fn:any)=>(req:any,res:any,next:any)=>Promise.resolve(fn(req,res,next)).catch(next);
+const tiers=["Building","Growing","Reliable","Established","Elite"] as const;
+type Tier=(typeof tiers)[number];
+const tier=(score:number):Tier=>score>=850?"Elite":score>=700?"Established":score>=500?"Reliable":score>=250?"Growing":"Building";
+const userExists=(u:string)=>db.users.has(u);
 
-const asyncRoute = (fn: any) => (req: any, res: any, next: any) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
+app.get("/health",(_req,res)=>res.json({ok:true,service:"kikoba"}));
+app.post("/v1/auth/register",asyncRoute((req:any,res:any)=>{const b=z.object({name:z.string().trim().min(2,"Enter at least 2 characters"),email:z.string().email("Enter a valid email")}).parse(req.body);if([...db.users.values()].some(u=>u.email===b.email))return res.status(409).json({error:"EMAIL_EXISTS"});res.status(201).json(createUser(b.name,b.email));}));
+app.get("/v1/users/:userId/dashboard",asyncRoute((req:any,res:any)=>{if(!userExists(req.params.userId))return res.status(404).json({error:"USER_NOT_FOUND"});res.json(dashboard(req.params.userId));}));
+app.get("/v1/users/:userId/score",(req,res)=>{if(!userExists(req.params.userId))return res.status(404).json({error:"USER_NOT_FOUND"});const s=userScore(req.params.userId);res.json({...s,tier:tier(s.score)});});
 
-const tiers = ["Building", "Growing", "Reliable", "Established", "Elite"] as const;
-type Tier = (typeof tiers)[number];
-const tier = (score: number): Tier => score >= 850 ? "Elite" : score >= 700 ? "Established" : score >= 500 ? "Reliable" : score >= 250 ? "Growing" : "Building";
+app.post("/v1/goals",asyncRoute((req:any,res:any)=>{const b=z.object({userId:z.string(),name:z.string().trim().min(2,"Give your goal a name"),targetAmount:z.number().positive("Target must be greater than zero"),targetDate:z.string().optional(),expectedAmount:z.number().positive("Contribution must be greater than zero"),frequency:z.enum(["WEEKLY","MONTHLY"]),priority:z.enum(["HIGH","NORMAL","LOW"]).optional()}).parse(req.body);if(!userExists(b.userId))return res.status(404).json({error:"USER_NOT_FOUND"});res.status(201).json(createGoal(b));}));
+app.get("/v1/users/:userId/goals",(req,res)=>res.json([...db.goals.values()].filter(g=>g.userId===req.params.userId)));
+app.post("/v1/deposits",asyncRoute((req:any,res:any)=>{const b=z.object({userId:z.string(),amount:z.number().positive("Deposit must be greater than zero"),goalId:z.string().optional()}).parse(req.body);if(!userExists(b.userId))return res.status(404).json({error:"USER_NOT_FOUND"});res.status(201).json(makeDeposit(b.userId,b.amount,b.goalId));}));
 
-app.get("/health", (_req, res) => res.json({ ok: true, service: "kikoba" }));
+app.get("/v1/users/search",(req,res)=>{const q=String(req.query.q??"").toLowerCase();res.json([...db.users.values()].filter(u=>u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)).slice(0,20));});
+app.get("/v1/users/:userId/friends",(req,res)=>res.json([...db.friends.get(req.params.userId)??[]].map(i=>db.users.get(i)).filter(Boolean)));
+app.post("/v1/friend-requests",asyncRoute((req:any,res:any)=>{const b=z.object({fromId:z.string(),toId:z.string()}).parse(req.body);if(!userExists(b.fromId)||!userExists(b.toId)||b.fromId===b.toId)return res.status(400).json({error:"INVALID_REQUEST"});const e=[...db.friendRequests.values()].find(r=>r.status==="PENDING"&&((r.fromId===b.fromId&&r.toId===b.toId)||(r.fromId===b.toId&&r.toId===b.fromId)));if(e)return res.status(409).json({error:"REQUEST_EXISTS"});const r={id:id(),fromId:b.fromId,toId:b.toId,createdAt:new Date(),status:"PENDING" as const};db.friendRequests.set(r.id,r);res.status(201).json(r);}));
+app.get("/v1/users/:userId/friend-requests",(req,res)=>res.json([...db.friendRequests.values()].filter(r=>r.toId===req.params.userId&&r.status==="PENDING").map(r=>({...r,from:db.users.get(r.fromId)}))));
+app.post("/v1/friend-requests/:id/respond",asyncRoute((req:any,res:any)=>{const b=z.object({userId:z.string(),accept:z.boolean()}).parse(req.body);const r=db.friendRequests.get(req.params.id);if(!r||r.toId!==b.userId)return res.status(404).json({error:"REQUEST_NOT_FOUND"});r.status=b.accept?"ACCEPTED":"DECLINED";if(b.accept)addFriend(r.fromId,r.toId);res.json(r);}));
 
-app.post("/v1/auth/register", asyncRoute((req: any, res: any) => {
-  const b = z.object({ name: z.string().min(2), email: z.string().email() }).parse(req.body);
-  if ([...db.users.values()].some(u => u.email === b.email)) return res.status(409).json({ error: "EMAIL_EXISTS" });
-  res.status(201).json(createUser(b.name, b.email));
-}));
-
-app.get("/v1/users/:userId/dashboard", asyncRoute((req: any, res: any) => res.json(dashboard(req.params.userId))));
-app.get("/v1/users/:userId/score", (req, res) => {
-  const s = userScore(req.params.userId);
-  res.json({ ...s, tier: tier(s.score) });
-});
-
-app.post("/v1/goals", asyncRoute((req: any, res: any) => {
-  const b = z.object({ userId: z.string(), name: z.string().min(2), targetAmount: z.number().positive(), targetDate: z.string().optional(), expectedAmount: z.number().positive(), frequency: z.enum(["WEEKLY", "MONTHLY"]), priority: z.enum(["HIGH", "NORMAL", "LOW"]).optional() }).parse(req.body);
-  if (!db.users.has(b.userId)) return res.status(404).json({ error: "USER_NOT_FOUND" });
-  res.status(201).json(createGoal(b));
-}));
-app.get("/v1/users/:userId/goals", (req, res) => res.json([...db.goals.values()].filter(g => g.userId === req.params.userId)));
-
-app.post("/v1/deposits", asyncRoute((req: any, res: any) => {
-  const b = z.object({ userId: z.string(), amount: z.number().positive(), goalId: z.string().optional() }).parse(req.body);
-  if (!db.users.has(b.userId)) return res.status(404).json({ error: "USER_NOT_FOUND" });
-  res.status(201).json(makeDeposit(b.userId, b.amount, b.goalId));
-}));
-
-app.get("/v1/users/search", (req, res) => {
-  const q = String(req.query.q ?? "").toLowerCase();
-  res.json([...db.users.values()].filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)).slice(0, 20));
-});
-app.get("/v1/users/:userId/friends", (req, res) => res.json([...db.friends.get(req.params.userId) ?? []].map(i => db.users.get(i)).filter(Boolean)));
-
-app.post("/v1/friend-requests", asyncRoute((req: any, res: any) => {
-  const b = z.object({ fromId: z.string(), toId: z.string() }).parse(req.body);
-  if (!db.users.has(b.fromId) || !db.users.has(b.toId) || b.fromId === b.toId) return res.status(400).json({ error: "INVALID_REQUEST" });
-  const existing = [...db.friendRequests.values()].find(r => r.status === "PENDING" && ((r.fromId === b.fromId && r.toId === b.toId) || (r.fromId === b.toId && r.toId === b.fromId)));
-  if (existing) return res.status(409).json({ error: "REQUEST_EXISTS" });
-  const r = { id: id(), fromId: b.fromId, toId: b.toId, createdAt: new Date(), status: "PENDING" as const };
-  db.friendRequests.set(r.id, r);
-  res.status(201).json(r);
-}));
-app.get("/v1/users/:userId/friend-requests", (req, res) => res.json([...db.friendRequests.values()].filter(r => r.toId === req.params.userId && r.status === "PENDING").map(r => ({ ...r, from: db.users.get(r.fromId) }))));
-app.post("/v1/friend-requests/:id/respond", asyncRoute((req: any, res: any) => {
-  const b = z.object({ userId: z.string(), accept: z.boolean() }).parse(req.body);
-  const r = db.friendRequests.get(req.params.id);
-  if (!r || r.toId !== b.userId) return res.status(404).json({ error: "REQUEST_NOT_FOUND" });
-  r.status = b.accept ? "ACCEPTED" : "DECLINED";
-  if (b.accept) addFriend(r.fromId, r.toId);
-  res.json(r);
-}));
-
-app.get("/v1/chamas", (req, res) => {
-  const userId = String(req.query.userId ?? "");
-  const list = [...db.chamas.values()].map(c => ({
-    ...c,
-    members: c.memberIds.map(i => db.users.get(i)).filter(Boolean),
-    joined: c.memberIds.includes(userId),
-    open: c.memberIds.length < c.maxMembers
-  }));
-  res.json(list);
-});
-
-app.get("/v1/chamas/match", (req, res) => {
-  const userId = String(req.query.userId ?? "");
-  const userTier = tier(userScore(userId).score);
-  const rank = tiers.indexOf(userTier);
-  const matches = [...db.chamas.values()]
-    .filter(c => c.memberIds.length < c.maxMembers && tiers.indexOf(c.minTier as Tier) <= rank)
-    .map(c => ({ ...c, matchScore: Math.min(99, 65 + (c.frequency === "WEEKLY" ? 10 : 5) + (c.memberIds.length > 1 ? 8 : 0)) }))
-    .sort((a, b) => b.matchScore - a.matchScore);
-  res.json({ tier: userTier, matches });
-});
-
-app.post("/v1/chamas", asyncRoute((req: any, res: any) => {
-  const b = z.object({ ownerId: z.string(), name: z.string().min(2), type: z.enum(["LONG_TERM", "SHORT_TERM"]), contribution: z.number().positive(), frequency: z.enum(["WEEKLY", "MONTHLY"]), maxMembers: z.number().int().min(2).max(50), minTier: z.enum(tiers), goal: z.string().optional(), memberIds: z.array(z.string()).optional() }).parse(req.body);
-  const members = [...new Set([b.ownerId, ...(b.memberIds ?? [])])];
-  const c = { id: id(), name: b.name, ownerId: b.ownerId, memberIds: members, type: b.type, contribution: b.contribution, frequency: b.frequency, maxMembers: b.maxMembers, minTier: b.minTier, goal: b.goal, createdAt: new Date() };
-  db.chamas.set(c.id, c);
-  const conv = { id: id(), memberIds: members, createdAt: new Date(), chamaId: c.id };
-  db.conversations.set(conv.id, conv);
-  db.messages.set(conv.id, []);
-  res.status(201).json({ ...c, conversationId: conv.id });
-}));
-
-app.post("/v1/chamas/:id/join", asyncRoute((req: any, res: any) => {
-  const b = z.object({ userId: z.string() }).parse(req.body);
-  const c = db.chamas.get(req.params.id);
-  if (!c) return res.status(404).json({ error: "CHAMA_NOT_FOUND" });
-  if (c.memberIds.length >= c.maxMembers) return res.status(409).json({ error: "CHAMA_FULL" });
-  const rank = tiers.indexOf(tier(userScore(b.userId).score));
-  if (rank < tiers.indexOf(c.minTier as Tier)) return res.status(403).json({ error: "TIER_TOO_LOW", required: c.minTier });
-  if (!c.memberIds.includes(b.userId)) c.memberIds.push(b.userId);
-  const conv = [...db.conversations.values()].find(x => x.chamaId === c.id);
-  if (conv && !conv.memberIds.includes(b.userId)) conv.memberIds.push(b.userId);
-  const missed = c.cycleStartedAt ? Math.max(0, Math.floor((Date.now() - c.cycleStartedAt.getTime()) / (c.frequency === "WEEKLY" ? 604800000 : 2592000000))) : 0;
-  res.json({ chama: c, catchUp: missed * c.contribution, missedCycles: missed });
-}));
-
-app.get("/v1/users/:userId/chamas", (req, res) => res.json([...db.chamas.values()].filter(c => c.memberIds.includes(req.params.userId))));
-app.get("/v1/chamas/:id/messages", (req, res) => {
-  const conv = [...db.conversations.values()].find(c => c.chamaId === req.params.id);
-  res.json(conv ? (db.messages.get(conv.id) ?? []) : []);
-});
-app.post("/v1/chamas/:id/messages", asyncRoute((req: any, res: any) => {
-  const b = z.object({ senderId: z.string(), body: z.string().min(1).max(1000) }).parse(req.body);
-  const conv = [...db.conversations.values()].find(c => c.chamaId === req.params.id);
-  if (!conv || !conv.memberIds.includes(b.senderId)) return res.status(403).json({ error: "NOT_CHAMA_MEMBER" });
-  const m = { id: id(), conversationId: conv.id, senderId: b.senderId, body: b.body, createdAt: new Date() };
-  db.messages.get(conv.id)!.push(m);
-  res.status(201).json(m);
-}));
-
-app.use((err: any, _req: any, res: any, _next: any) => {
-  if (err instanceof z.ZodError) return res.status(400).json({ error: "VALIDATION_ERROR", details: err.issues });
-  console.error(err);
-  res.status(500).json({ error: "INTERNAL_ERROR" });
-});
-
-if (process.env.VERCEL !== "1") app.listen(process.env.PORT || 3000, () => console.log("Kikoba API listening"));
+const chamaView=(c:any,userId="")=>({...c,members:c.memberIds.map((i:string)=>db.users.get(i)).filter(Boolean),joined:c.memberIds.includes(userId),open:c.memberIds.length<c.maxMembers});
+app.get("/v1/chamas/match",(req,res)=>{const userId=String(req.query.userId??"");if(!userExists(userId))return res.status(404).json({error:"USER_NOT_FOUND"});const userTier=tier(userScore(userId).score),rank=tiers.indexOf(userTier);const matches=[...db.chamas.values()].filter(c=>c.memberIds.length<c.maxMembers&&!c.memberIds.includes(userId)&&tiers.indexOf(c.minTier as Tier)<=rank).map(c=>({...chamaView(c,userId),matchScore:Math.min(99,70+(c.frequency==="WEEKLY"?8:4)+(c.memberIds.length>1?8:0))})).sort((a,b)=>b.matchScore-a.matchScore);res.json({tier:userTier,matches});});
+app.get("/v1/chamas",(req,res)=>{const u=String(req.query.userId??"");res.json([...db.chamas.values()].map(c=>chamaView(c,u)));});
+app.post("/v1/chamas",asyncRoute((req:any,res:any)=>{const b=z.object({ownerId:z.string(),name:z.string().trim().min(2,"Give your Chama a name"),type:z.enum(["LONG_TERM","SHORT_TERM"]),contribution:z.number().positive("Contribution must be greater than zero"),frequency:z.enum(["WEEKLY","MONTHLY"]),maxMembers:z.number().int().min(2,"At least 2 members are required").max(50),minTier:z.enum(tiers),goal:z.string().trim().optional(),memberIds:z.array(z.string()).optional()}).parse(req.body);if(!userExists(b.ownerId))return res.status(404).json({error:"USER_NOT_FOUND"});const requested=[...new Set(b.memberIds??[])].filter(x=>x!==b.ownerId&&userExists(x));const members=[b.ownerId,...requested];if(members.length>b.maxMembers)return res.status(400).json({error:"MEMBER_LIMIT",message:"Selected members exceed your maximum member limit"});const c={id:id(),name:b.name,ownerId:b.ownerId,memberIds:members,type:b.type,contribution:b.contribution,frequency:b.frequency,maxMembers:b.maxMembers,minTier:b.minTier,goal:b.goal||undefined,cycleStartedAt:new Date(),createdAt:new Date()};db.chamas.set(c.id,c);const conv={id:id(),memberIds:members,createdAt:new Date(),chamaId:c.id};db.conversations.set(conv.id,conv);db.messages.set(conv.id,[]);res.status(201).json({...chamaView(c,b.ownerId),conversationId:conv.id});}));
+app.post("/v1/chamas/:id/join",asyncRoute((req:any,res:any)=>{const b=z.object({userId:z.string()}).parse(req.body);const c=db.chamas.get(req.params.id);if(!c)return res.status(404).json({error:"CHAMA_NOT_FOUND"});if(c.memberIds.includes(b.userId))return res.json({chama:c,catchUp:0,missedCycles:0,alreadyMember:true});if(c.memberIds.length>=c.maxMembers)return res.status(409).json({error:"CHAMA_FULL"});const rank=tiers.indexOf(tier(userScore(b.userId).score));if(rank<tiers.indexOf(c.minTier as Tier))return res.status(403).json({error:"TIER_TOO_LOW",required:c.minTier});c.memberIds.push(b.userId);const conv=[...db.conversations.values()].find(x=>x.chamaId===c.id);if(conv&&!conv.memberIds.includes(b.userId))conv.memberIds.push(b.userId);const unit=c.frequency==="WEEKLY"?604800000:2592000000,missed=c.cycleStartedAt?Math.max(0,Math.floor((Date.now()-c.cycleStartedAt.getTime())/unit)):0;res.json({chama:chamaView(c,b.userId),catchUp:missed*c.contribution,missedCycles:missed});}));
+app.get("/v1/users/:userId/chamas",(req,res)=>res.json([...db.chamas.values()].filter(c=>c.memberIds.includes(req.params.userId))));
+app.get("/v1/chamas/:id/messages",(req,res)=>{const c=[...db.conversations.values()].find(x=>x.chamaId===req.params.id);res.json(c?(db.messages.get(c.id)??[]):[]);});
+app.post("/v1/chamas/:id/messages",asyncRoute((req:any,res:any)=>{const b=z.object({senderId:z.string(),body:z.string().trim().min(1).max(1000)}).parse(req.body);const c=[...db.conversations.values()].find(x=>x.chamaId===req.params.id);if(!c||!c.memberIds.includes(b.senderId))return res.status(403).json({error:"NOT_CHAMA_MEMBER"});const m={id:id(),conversationId:c.id,senderId:b.senderId,body:b.body,createdAt:new Date()};db.messages.get(c.id)!.push(m);res.status(201).json(m);}));
+app.use((err:any,_req:any,res:any,_next:any)=>{if(err instanceof z.ZodError)return res.status(400).json({error:"VALIDATION_ERROR",message:err.issues.map((i:any)=>i.message).join(". "),details:err.issues});console.error(err);res.status(500).json({error:"INTERNAL_ERROR"});});
+if(process.env.VERCEL!=="1")app.listen(process.env.PORT||3000,()=>console.log("Kikoba API listening"));
