@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-export type User={id:string;name:string;email:string;createdAt:Date};
+export type User={id:string;name:string;username:string;email:string;createdAt:Date};
 export type Goal={id:string;userId:string;name:string;targetAmount:number;targetDate?:Date;expectedAmount:number;frequency:"WEEKLY"|"MONTHLY";priority:"HIGH"|"NORMAL"|"LOW";status:"ACTIVE"|"PAUSED"|"COMPLETED";createdAt:Date};
 export type Contribution={id:string;userId:string;goalId:string;expectedAmount:number;amountPaid:number;dueDate:Date;gracePeriodEnd:Date;status:any;completedAt?:Date;recoveredAt?:Date};
 export type Deposit={id:string;userId:string;amount:number;goalId?:string;createdAt:Date};
