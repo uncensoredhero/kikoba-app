@@ -1,41 +1,33 @@
-// Recover stale browser sessions created before Kikoba moved to the persistent Neon backend.
-// The email is the stable identity; the backend returns the canonical persistent user ID.
+// Canonical Neon session recovery for the current Kikoba frontend.
+// This file intentionally does not call old prototype functions.
 (async function () {
-  async function syncPersistentUser() {
-    if (typeof user === 'undefined' || !user || !user.email || !user.name) return;
-    try {
-      const canonical = await api('/auth/session', 'POST', { email: user.email, name: user.name });
-      if (!canonical || !canonical.id) return;
-      const changed = canonical.id !== user.id;
-      user = canonical;
-      localStorage.setItem('kikobaUser', JSON.stringify(user));
-      if (changed) {
-        setupPhoto();
-        await load();
-        await loadProfile();
-      }
-    } catch (error) {
-      console.warn('Kikoba session sync failed', error);
+  const KEY = 'kikobaUser';
+  const RELOAD_KEY = 'kikobaCanonicalReload';
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { saved = null; }
+  if (!saved || !saved.email || !saved.name) return;
+
+  try {
+    const response = await fetch('/api/v1/auth/session', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: saved.email, name: saved.name })
+    });
+    if (!response.ok) return;
+    const canonical = await response.json();
+    if (!canonical || !canonical.id) return;
+
+    const previousId = saved.id;
+    localStorage.setItem(KEY, JSON.stringify(canonical));
+    window.user = canonical;
+
+    // If this browser was carrying an old/demo ID, reload once so every
+    // dashboard, chama, goal and friend request starts with the Neon ID.
+    if (canonical.id !== previousId && sessionStorage.getItem(RELOAD_KEY) !== canonical.id) {
+      sessionStorage.setItem(RELOAD_KEY, canonical.id);
+      location.reload();
     }
+  } catch (error) {
+    console.warn('Kikoba session recovery failed', error);
   }
-
-  // Replace registration with idempotent account recovery/creation. Reusing the
-  // same email now opens the existing persistent account instead of returning EMAIL_EXISTS.
-  const registerButton = document.getElementById('register');
-  if (registerButton) {
-    registerButton.onclick = async function () {
-      try {
-        const name = document.getElementById('name').value.trim();
-        const email = document.getElementById('email').value.trim();
-        const u = await api('/auth/session', 'POST', { name, email });
-        user = u;
-        localStorage.setItem('kikobaUser', JSON.stringify(u));
-        start();
-      } catch (e) {
-        setMsg('authMsg', e.message || 'Could not create or recover your account.');
-      }
-    };
-  }
-
-  await syncPersistentUser();
 })();
