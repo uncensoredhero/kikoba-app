@@ -5,7 +5,7 @@
     "api/v1/[...path].ts": { "includeFiles": "public/**" }
   },
   "rewrites": [
-    { "source": "/", "destination": "/api/index" },
+    { "source": "/", "destination": "/app.html" },
     { "source": "/health", "destination": "/api/[...path]" }
   ]
 }
