@@ -1,9 +1,31 @@
-generator client { provider = "prisma-client-js" }
+generator client {
+  provider = "prisma-client-js"
+}
 
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
-enum GoalStatus { DRAFT ACTIVE PAUSED COMPLETED CANCELLED EXPIRED }
-enum ContributionStatus { PENDING PARTIAL ON_TIME GRACE LATE MISSED RECOVERED }
+enum GoalStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum ContributionStatus {
+  PENDING
+  PARTIAL
+  ON_TIME
+  GRACE
+  LATE
+  MISSED
+  RECOVERED
+}
+
 enum DepositStatus { PENDING SUCCESSFUL FAILED REVERSED }
 enum AllocationMode { EXPLICIT AUTO_ALLOCATE }
 enum Priority { HIGH NORMAL LOW }
@@ -52,7 +74,7 @@ model Chama {
   ownerId String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  owner User @relation("ChamaOwner", fields:[ownerId], references:[id], onDelete: Restrict)
+  owner User @relation("ChamaOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   members ChamaMember[]
   conversation Conversation?
   @@index([status, type, frequency])
@@ -67,8 +89,8 @@ model ChamaMember {
   status MembershipStatus @default(ACTIVE)
   joinedAt DateTime @default(now())
   leftAt DateTime?
-  chama Chama @relation(fields:[chamaId], references:[id], onDelete: Cascade)
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  chama Chama @relation(fields: [chamaId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([chamaId, userId])
   @@index([userId, status])
   @@index([chamaId, status])
@@ -81,8 +103,8 @@ model FriendRequest {
   status FriendRequestStatus @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  from User @relation("FriendRequestSender", fields:[fromId], references:[id], onDelete: Cascade)
-  to User @relation("FriendRequestReceiver", fields:[toId], references:[id], onDelete: Cascade)
+  from User @relation("FriendRequestSender", fields: [fromId], references: [id], onDelete: Cascade)
+  to User @relation("FriendRequestReceiver", fields: [toId], references: [id], onDelete: Cascade)
   @@index([toId, status])
   @@index([fromId, status])
 }
@@ -92,8 +114,8 @@ model Friendship {
   userAId String
   userBId String
   createdAt DateTime @default(now())
-  userA User @relation("FriendshipUserA", fields:[userAId], references:[id], onDelete: Cascade)
-  userB User @relation("FriendshipUserB", fields:[userBId], references:[id], onDelete: Cascade)
+  userA User @relation("FriendshipUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("FriendshipUserB", fields: [userBId], references: [id], onDelete: Cascade)
   @@unique([userAId, userBId])
   @@index([userAId])
   @@index([userBId])
@@ -104,7 +126,7 @@ model Conversation {
   chamaId String? @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  chama Chama? @relation(fields:[chamaId], references:[id], onDelete: Cascade)
+  chama Chama? @relation(fields: [chamaId], references: [id], onDelete: Cascade)
   members ConversationMember[]
   messages Message[]
 }
@@ -114,8 +136,8 @@ model ConversationMember {
   conversationId String
   userId String
   joinedAt DateTime @default(now())
-  conversation Conversation @relation(fields:[conversationId], references:[id], onDelete: Cascade)
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([conversationId, userId])
   @@index([userId])
 }
@@ -127,8 +149,8 @@ model Message {
   body String @db.Text
   createdAt DateTime @default(now())
   editedAt DateTime?
-  conversation Conversation @relation(fields:[conversationId], references:[id], onDelete: Cascade)
-  sender User @relation("MessageSender", fields:[senderId], references:[id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   @@index([conversationId, createdAt])
 }
 
@@ -143,7 +165,7 @@ model SavingsGoal {
   priority Priority @default(NORMAL)
   status GoalStatus @default(DRAFT)
   createdAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   contributions ExpectedContribution[]
 }
 
@@ -159,8 +181,8 @@ model ExpectedContribution {
   completedAt DateTime?
   recoveredAt DateTime?
   createdAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
-  goal SavingsGoal? @relation(fields:[goalId], references:[id], onDelete: SetNull)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal SavingsGoal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
   allocations DepositAllocation[]
   @@index([userId, dueDate, status])
 }
@@ -175,7 +197,7 @@ model Deposit {
   source String?
   createdAt DateTime @default(now())
   reversedAt DateTime?
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   allocations DepositAllocation[]
 }
 
@@ -186,8 +208,8 @@ model DepositAllocation {
   amount Decimal @db.Decimal(18,2)
   createdAt DateTime @default(now())
   reversedAt DateTime?
-  deposit Deposit @relation(fields:[depositId], references:[id], onDelete: Cascade)
-  contribution ExpectedContribution @relation(fields:[contributionId], references:[id], onDelete: Cascade)
+  deposit Deposit @relation(fields: [depositId], references: [id], onDelete: Cascade)
+  contribution ExpectedContribution @relation(fields: [contributionId], references: [id], onDelete: Cascade)
   @@index([depositId])
   @@index([contributionId])
 }
@@ -200,7 +222,7 @@ model FinancialEvent {
   entityId String
   metadata Json?
   createdAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, createdAt])
 }
 
@@ -219,7 +241,7 @@ model ScoreFeature {
   confidence Float
   eventCount Int
   calculatedAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserScore {
@@ -231,6 +253,6 @@ model UserScore {
   reason String?
   featureSnapshot Json
   calculatedAt DateTime @default(now())
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, calculatedAt])
 }
