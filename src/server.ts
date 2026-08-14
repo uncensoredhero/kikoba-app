@@ -10,7 +10,7 @@ const asyncRoute=(fn:any)=>(req:any,res:any,next:any)=>Promise.resolve(fn(req,re
 const tiers=["Building","Growing","Reliable","Established","Elite"] as const;type Tier=(typeof tiers)[number];
 const tier=(score:number):Tier=>score>=850?"Elite":score>=700?"Established":score>=500?"Reliable":score>=250?"Growing":"Building";
 const userExists=async(id:string)=>!!(await prisma.user.findUnique({where:{id},select:{id:true}}));
-const uniqueUsername=async(name:string)=>{const base=name.toLowerCase().replace(/[^a-z0-9_]/g,"_").replace(/^_+|_+$/g,"").slice(0,16)||"user";let candidate=base;let n=1;while(await prisma.user.findUnique({where:{username:candidate}})){candidate=`${base.slice(0,Math.max(1,20-String(n).length)}${n++}`;}return candidate;};
+const uniqueUsername=async(name:string)=>{const base=name.toLowerCase().replace(/[^a-z0-9_]/g,"_").replace(/^_+|_+$/g,"").slice(0,16)||"user";let candidate=base;let n=1;while(await prisma.user.findUnique({where:{username:candidate}})){candidate=`${base.slice(0,Math.max(1,20-String(n).length))}${n++}`;}return candidate;};
 const chamaView=(c:any,userId="")=>{const active=c.members.filter((m:any)=>m.status==="ACTIVE");return {...c,members:active.map((m:any)=>m.user),joined:active.some((m:any)=>m.userId===userId),open:active.length<c.maxMembers,memberIds:active.map((m:any)=>m.userId)};};
 
 app.get("/health",(_req,res)=>res.json({ok:true,service:"kikoba"}));
