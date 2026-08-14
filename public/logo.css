@@ -1,0 +1,4 @@
+/* Kikoba brand mark refinement */
+.brandMark{position:relative;overflow:visible;background:linear-gradient(145deg,#ffb43b,#f39a12)!important;border-radius:10px!important}
+.brandMark:before{content:"";position:absolute;width:10px;height:5px;top:9px;left:10px;border:2px solid #15372d;border-bottom:0;border-radius:5px 5px 0 0;background:transparent}
+.brandMark:after{content:""!important;position:absolute;width:14px!important;height:10px!important;left:8px;top:13px;border:2px solid #15372d!important;border-top:0!important;border-radius:2px 2px 8px 8px!important;background:rgba(255,255,255,.08);box-shadow:inset 0 -2px 0 rgba(21,55,45,.12)}
