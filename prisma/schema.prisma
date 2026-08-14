@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
 }
 
 enum GoalStatus {
@@ -15,7 +15,6 @@ enum GoalStatus {
   CANCELLED
   EXPIRED
 }
-
 enum ContributionStatus {
   PENDING
   PARTIAL
@@ -25,16 +24,61 @@ enum ContributionStatus {
   MISSED
   RECOVERED
 }
-
-enum DepositStatus { PENDING SUCCESSFUL FAILED REVERSED }
-enum AllocationMode { EXPLICIT AUTO_ALLOCATE }
-enum Priority { HIGH NORMAL LOW }
-enum EventType { DEPOSIT_SUCCESS DEPOSIT_REVERSED CONTRIBUTION_COMPLETED CONTRIBUTION_PARTIAL CONTRIBUTION_LATE CONTRIBUTION_MISSED CONTRIBUTION_RECOVERED GOAL_COMPLETED GOAL_CANCELLED GOAL_EXPIRED CHAMA_JOINED CHAMA_LEFT WITHDRAWAL_COMPLETED }
-enum ChamaType { LONG_TERM SHORT_TERM }
-enum ChamaFrequency { WEEKLY MONTHLY }
-enum MembershipRole { CREATOR ADMIN MEMBER }
-enum MembershipStatus { ACTIVE LEFT REMOVED PENDING }
-enum FriendRequestStatus { PENDING ACCEPTED DECLINED BLOCKED }
+enum DepositStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REVERSED
+}
+enum AllocationMode {
+  EXPLICIT
+  AUTO_ALLOCATE
+}
+enum Priority {
+  HIGH
+  NORMAL
+  LOW
+}
+enum EventType {
+  DEPOSIT_SUCCESS
+  DEPOSIT_REVERSED
+  CONTRIBUTION_COMPLETED
+  CONTRIBUTION_PARTIAL
+  CONTRIBUTION_LATE
+  CONTRIBUTION_MISSED
+  CONTRIBUTION_RECOVERED
+  GOAL_COMPLETED
+  GOAL_CANCELLED
+  GOAL_EXPIRED
+  CHAMA_JOINED
+  CHAMA_LEFT
+  WITHDRAWAL_COMPLETED
+}
+enum ChamaType {
+  LONG_TERM
+  SHORT_TERM
+}
+enum ChamaFrequency {
+  WEEKLY
+  MONTHLY
+}
+enum MembershipRole {
+  CREATOR
+  ADMIN
+  MEMBER
+}
+enum MembershipStatus {
+  ACTIVE
+  LEFT
+  REMOVED
+  PENDING
+}
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
 
 model User {
   id String @id @default(cuid())
