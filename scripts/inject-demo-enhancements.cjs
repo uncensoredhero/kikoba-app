@@ -1,0 +1,1 @@
+const fs=require('fs');const path='public/index.html';let html=fs.readFileSync(path,'utf8');const tag='<script src="/chama-details.js"></script>';if(!html.includes(tag)){html=html.replace('</body>',tag+'\n</body>');fs.writeFileSync(path,html);console.log('Injected Kikoba demo enhancements');}else console.log('Kikoba demo enhancements already present');
