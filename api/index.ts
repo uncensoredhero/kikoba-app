@@ -6,19 +6,21 @@ import { app } from "../src/server.js";
 export default function handler(req: IncomingMessage & { url?: string }, res: ServerResponse) {
   res.setHeader("Link", "</logo.css>; rel=stylesheet");
 
-  // The session compatibility layer must execute BEFORE Kikoba's inline app
-  // script. The previous version injected it at </body>, after the app had
-  // already captured and started using the stale prototype user ID.
   if (req.url === "/" || req.url === "/api/index") {
     try {
-      const html = readFileSync(join(process.cwd(), "public", "index.html"), "utf8")
-        .replace("</head>", '<script src="/session-fix.js"></script></head>');
+      let html = readFileSync(join(process.cwd(), "public", "index.html"), "utf8");
+      // Inline enhancement scripts because / is served by this serverless function
+      // and public JS files are not guaranteed to be exposed as standalone routes.
+      const enhancement = readFileSync(join(process.cwd(), "public", "chama-details.js"), "utf8");
+      const session = readFileSync(join(process.cwd(), "public", "session-fix.js"), "utf8");
+      html = html.replace("</head>", `<script>${session}</script></head>`);
+      html = html.replace("</body>", `<script>${enhancement}</script></body>`);
       res.statusCode = 200;
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.end(html);
       return;
-    } catch {
-      // Fall through to Express if the frontend file cannot be read.
+    } catch (error) {
+      console.error("Failed to load Kikoba demo frontend", error);
     }
   }
 
